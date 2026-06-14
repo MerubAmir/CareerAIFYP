@@ -1,1 +1,9 @@
--r backend/requirements.txt
+fastapi
+uvicorn
+python-multipart
+pypdf
+python-docx
+pymongo
+python-dotenv
+certifi
+mongomock
