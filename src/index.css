@@ -1,0 +1,170 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@400;500;600;700;800&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 33% 99%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 195 95% 46%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 193 83% 91%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 42%;
+    --accent: 196 90% 58%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 80% 63%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214 32% 89%;
+    --input: 214 32% 89%;
+    --ring: 195 95% 46%;
+    --radius: 0.75rem;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 195 95% 46%;
+    --sidebar-primary-foreground: 210 40% 98%;
+    --sidebar-accent: 210 40% 96%;
+    --sidebar-accent-foreground: 222 47% 11%;
+    --sidebar-border: 214 32% 89%;
+    --sidebar-ring: 195 95% 46%;
+  }
+
+  .dark {
+    --background: 228 34% 9%;
+    --foreground: 210 40% 98%;
+    --card: 226 32% 12%;
+    --card-foreground: 210 40% 98%;
+    --popover: 226 32% 12%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 191 91% 59%;
+    --primary-foreground: 224 71% 4%;
+    --secondary: 230 25% 18%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 228 23% 16%;
+    --muted-foreground: 215 20% 70%;
+    --accent: 281 89% 72%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62% 44%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 227 22% 22%;
+    --input: 227 22% 22%;
+    --ring: 191 91% 59%;
+    --sidebar-background: 226 32% 12%;
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 191 91% 59%;
+    --sidebar-primary-foreground: 224 71% 4%;
+    --sidebar-accent: 228 23% 16%;
+    --sidebar-accent-foreground: 210 40% 98%;
+    --sidebar-border: 227 22% 22%;
+    --sidebar-ring: 191 91% 59%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: "Manrope", sans-serif;
+    background-image:
+      radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 28%),
+      radial-gradient(circle at top right, rgba(34, 211, 238, 0.12), transparent 24%),
+      linear-gradient(180deg, #f7fbff 0%, #f9fffd 45%, #ffffff 100%);
+    min-height: 100vh;
+    transition: background-color 220ms ease, color 220ms ease, background-image 220ms ease;
+  }
+
+  .dark body {
+    background-image:
+      radial-gradient(circle at top left, rgba(56, 189, 248, 0.16), transparent 25%),
+      radial-gradient(circle at top right, rgba(192, 132, 252, 0.16), transparent 22%),
+      linear-gradient(180deg, #090d1a 0%, #0f172a 48%, #111827 100%);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  .font-heading {
+    font-family: "Sora", sans-serif;
+  }
+
+  ::selection {
+    background: rgba(94, 234, 212, 0.35);
+  }
+
+  select {
+    color-scheme: light;
+  }
+
+  .dark select {
+    color-scheme: dark;
+  }
+}
+
+@layer utilities {
+  .panel-surface {
+    @apply border border-border/70 bg-card/80 shadow-lg shadow-slate-200/40 backdrop-blur-md dark:shadow-[0_20px_60px_rgba(15,23,42,0.45)];
+  }
+
+  .hero-grid {
+    background-image:
+      linear-gradient(rgba(15, 23, 42, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15, 23, 42, 0.045) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: linear-gradient(180deg, black 0%, transparent 78%);
+  }
+
+  .dark .hero-grid {
+    background-image:
+      linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+  }
+
+  .app-select {
+    @apply border-border bg-background text-foreground shadow-sm transition-all duration-200 hover:border-cyan-500/60 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30;
+  }
+
+  .interactive-card {
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:border-cyan-500/40 hover:shadow-lg motion-reduce:transform-none;
+  }
+
+  .ai-surface {
+    background:
+      linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(99, 102, 241, 0.1) 50%, rgba(217, 70, 239, 0.1)),
+      hsl(var(--card) / 0.88);
+    @apply border border-cyan-500/25 shadow-[0_18px_60px_rgba(14,165,233,0.12)] backdrop-blur-xl;
+  }
+
+  .dark .ai-surface {
+    background:
+      linear-gradient(135deg, rgba(34, 211, 238, 0.12), rgba(99, 102, 241, 0.14) 50%, rgba(217, 70, 239, 0.1)),
+      hsl(var(--card) / 0.9);
+    box-shadow: 0 20px 70px rgba(34, 211, 238, 0.1);
+  }
+
+  .ai-text-gradient {
+    @apply bg-gradient-to-r from-sky-500 via-indigo-500 to-fuchsia-500 bg-clip-text text-transparent dark:from-cyan-300 dark:via-indigo-300 dark:to-fuchsia-300;
+  }
+
+  .ai-page-title {
+    @apply bg-gradient-to-r from-slate-950 via-indigo-700 to-fuchsia-700 bg-clip-text text-transparent dark:from-white dark:via-cyan-200 dark:to-fuchsia-200;
+  }
+
+  .ai-page-title-on-dark {
+    @apply bg-gradient-to-r from-white via-cyan-200 to-fuchsia-200 bg-clip-text text-transparent;
+  }
+}

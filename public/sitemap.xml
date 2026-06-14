@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://careerai.app/</loc>
+  </url>
+  <url>
+    <loc>https://careerai.app/auth</loc>
+  </url>
+  <url>
+    <loc>https://careerai.app/dashboard</loc>
+  </url>
+  <url>
+    <loc>https://careerai.app/jobs</loc>
+  </url>
+  <url>
+    <loc>https://careerai.app/skills</loc>
+  </url>
+  <url>
+    <loc>https://careerai.app/roadmap</loc>
+  </url>
+</urlset>

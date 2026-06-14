@@ -1,0 +1,49 @@
+{
+  "users": [
+    {
+      "name": "Smoke User",
+      "email": "smokea844e72ccd654aec8bb44cb896fbc728@example.com",
+      "passwordHash": "10962dcd0e9073d09987c61df0f3349c$c954cd83f915f64dece28af3fdbfdae8872d2e3935f3b935b29c15f064c4c308",
+      "skills": [],
+      "githubUsername": null,
+      "targetRole": null,
+      "resumeText": null,
+      "education": null,
+      "summary": null,
+      "experienceLevel": "Beginner",
+      "lastUpdated": "2026-06-10T05:08:41.888522+00:00",
+      "createdAt": "2026-06-10T05:08:41.888522+00:00",
+      "_id": "6a28f159482d8b5421a00f78"
+    },
+    {
+      "name": "Smoke User",
+      "email": "smokeac1307e02fb447fe90d48694e28c1e49@example.com",
+      "passwordHash": "c4b25902dc1c62cf1d821903b6733aef$b45414f295db94717e751446f79701e2693be7b4c300e940ef9ce0626c9df56b",
+      "skills": [],
+      "githubUsername": null,
+      "targetRole": null,
+      "resumeText": null,
+      "education": null,
+      "summary": null,
+      "experienceLevel": "Beginner",
+      "lastUpdated": "2026-06-10T05:09:40.620558+00:00",
+      "createdAt": "2026-06-10T05:09:40.620558+00:00",
+      "_id": "6a28f1943608d60feed9391f"
+    }
+  ],
+  "sessions": [
+    {
+      "token": "2L1Nwe7h9UwpSmW07YVQ_sDceSCj64PiS5eIbb-bYqo",
+      "userId": "6a28f159482d8b5421a00f78",
+      "createdAt": "2026-06-10T05:08:41.889525+00:00",
+      "_id": "6a28f159482d8b5421a00f79"
+    },
+    {
+      "token": "k6nmX_7h8DKRoRHJOu5Q7crwsQJoVnF4Me9Xx5R3rHA",
+      "userId": "6a28f1943608d60feed9391f",
+      "createdAt": "2026-06-10T05:09:40.620558+00:00",
+      "_id": "6a28f1943608d60feed93920"
+    }
+  ],
+  "bookmarks": []
+}
