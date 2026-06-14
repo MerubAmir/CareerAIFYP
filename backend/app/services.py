@@ -9,11 +9,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections import Counter
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import datetime, timedelta, timezone
+from html.parser import HTMLParser
 from io import BytesIO
 from pathlib import Path
-from threading import Lock, Thread
+from threading import Event, Lock, Thread
 
 import certifi
 from bson import ObjectId
@@ -90,6 +91,11 @@ _LIVE_JOB_CACHE_LOCK = Lock()
 _LIVE_JOB_REFRESH_LOCK = Lock()
 _LIVE_JOB_REFRESHING = False
 JOB_FETCH_TIMEOUT_SECONDS = float(os.getenv("JOB_FETCH_TIMEOUT_SECONDS", "18"))
+JOB_FETCH_TOTAL_TIMEOUT_SECONDS = float(os.getenv("JOB_FETCH_TOTAL_TIMEOUT_SECONDS", "22"))
+JOB_AUTO_REFRESH_MINUTES = max(5.0, float(os.getenv("JOB_AUTO_REFRESH_MINUTES", "30")))
+_JOB_SCHEDULER_STOP = Event()
+_JOB_SCHEDULER_LOCK = Lock()
+_JOB_SCHEDULER_THREAD: Thread | None = None
 MAX_RESUME_FILE_BYTES = 5 * 1024 * 1024
 ALLOWED_RESUME_SUFFIXES = {".pdf", ".docx"}
 RESUME_SECTION_PATTERN = re.compile(
@@ -323,6 +329,19 @@ def _fetch_json(url: str, headers: dict | None = None, timeout: float | None = N
     ssl_context = ssl.create_default_context(cafile=certifi.where())
     with urllib.request.urlopen(request, timeout=timeout or JOB_FETCH_TIMEOUT_SECONDS, context=ssl_context) as response:
         return json.load(response)
+
+
+def _fetch_html(url: str, headers: dict | None = None, timeout: float | None = None) -> str:
+    request_headers = {
+        "Accept": "text/html,application/xhtml+xml",
+        "User-Agent": "CareerAI-FYP-App/1.0",
+        **(headers or {}),
+    }
+    request = urllib.request.Request(url, headers=request_headers)
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+    with urllib.request.urlopen(request, timeout=timeout or JOB_FETCH_TIMEOUT_SECONDS, context=ssl_context) as response:
+        encoding = response.headers.get_content_charset() or "utf-8"
+        return response.read().decode(encoding, errors="replace")
 
 
 def _clean_html(value: str) -> str:
@@ -590,6 +609,95 @@ def _fetch_remoteok_jobs() -> list[dict]:
     return jobs
 
 
+class _JobzPakistanParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.rows: list[dict[str, list[str] | str]] = []
+        self._div_stack: list[str] = []
+        self._row: dict[str, list[str] | str] | None = None
+        self._cell_class: str | None = None
+        self._cell_parts: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "div":
+            if tag == "a" and self._row is not None and self._cell_class == "cell1":
+                href = dict(attrs).get("href") or ""
+                if re.search(r"_jobs-\d+\.html$", href):
+                    self._row.setdefault("url", href)
+            return
+
+        class_name = dict(attrs).get("class") or ""
+        self._div_stack.append(class_name)
+        if "row_container" in class_name.split():
+            self._row = {"cell1": [], "cell2": [], "cell3": [], "cell4": []}
+            return
+        if self._row is not None:
+            cell_class = next((name for name in class_name.split() if name in {"cell1", "cell2", "cell3", "cell4"}), None)
+            if cell_class:
+                self._cell_class = cell_class
+                self._cell_parts = []
+
+    def handle_data(self, data: str) -> None:
+        if self._row is not None and self._cell_class:
+            self._cell_parts.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag != "div" or not self._div_stack:
+            return
+        class_name = self._div_stack.pop()
+        if self._row is not None and self._cell_class and self._cell_class in class_name.split():
+            value = re.sub(r"\s+", " ", " ".join(self._cell_parts)).strip()
+            if value:
+                values = self._row.get(self._cell_class)
+                if isinstance(values, list):
+                    values.append(value)
+            self._cell_class = None
+            self._cell_parts = []
+        if "row_container" in class_name.split() and self._row is not None:
+            if self._row.get("url"):
+                self.rows.append(self._row)
+            self._row = None
+
+
+def _fetch_jobz_pakistan_jobs() -> list[dict]:
+    html = _fetch_html("https://www.jobz.pk/software-engineer-jobs/")
+    parser = _JobzPakistanParser()
+    parser.feed(html)
+    jobs = []
+    for row in parser.rows[:40]:
+        titles = row.get("cell1") or []
+        companies = row.get("cell2") or []
+        cities = row.get("cell3") or []
+        dates = row.get("cell4") or []
+        if not isinstance(titles, list) or not titles:
+            continue
+        title = titles[0]
+        description = titles[1] if len(titles) > 1 else title
+        company = companies[0] if isinstance(companies, list) and companies else "Pakistan employer"
+        city = cities[0] if isinstance(cities, list) and cities else "Pakistan"
+        date = dates[0].replace("/", "-") if isinstance(dates, list) and dates else ""
+        url = str(row.get("url") or "").replace("http://", "https://", 1)
+        job_id_match = re.search(r"_jobs-(\d+)\.html$", url)
+        jobs.append(
+            {
+                "id": f"jobzpk-{job_id_match.group(1) if job_id_match else urllib.parse.quote(title.lower())}",
+                "title": title,
+                "company": company,
+                "location": city if "pakistan" in city.lower() else f"{city}, Pakistan",
+                "type": "Full-time",
+                "salary": None,
+                "url": url,
+                "tags": _job_skill_tags(title, description),
+                "description": description[:420],
+                "date": date,
+                "source": "Jobz.pk",
+                "role": title,
+                "liveSource": True,
+            }
+        )
+    return jobs
+
+
 def _parse_cached_datetime(value: object) -> datetime | None:
     if isinstance(value, datetime):
         return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
@@ -642,16 +750,21 @@ def _dedupe_jobs(jobs: list[dict]) -> list[dict]:
 
 def _fetch_live_job_feed() -> list[dict]:
     jobs: list[dict] = []
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        tasks = {
-            executor.submit(provider): provider.__name__
-            for provider in (_fetch_jobicy_jobs, _fetch_arbeitnow_jobs, _fetch_remoteok_jobs)
-        }
-        for task in as_completed(tasks):
-            try:
-                jobs.extend(task.result())
-            except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, OSError) as exc:
-                print(f"[jobs] {tasks[task]} unavailable: {exc}")
+    executor = ThreadPoolExecutor(max_workers=4)
+    tasks = {
+        executor.submit(provider): provider.__name__
+        for provider in (_fetch_jobicy_jobs, _fetch_arbeitnow_jobs, _fetch_remoteok_jobs, _fetch_jobz_pakistan_jobs)
+    }
+    completed, pending = wait(tasks, timeout=JOB_FETCH_TOTAL_TIMEOUT_SECONDS)
+    for task in completed:
+        try:
+            jobs.extend(task.result())
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, OSError) as exc:
+            print(f"[jobs] {tasks[task]} unavailable: {exc}")
+    for task in pending:
+        print(f"[jobs] {tasks[task]} exceeded the {JOB_FETCH_TOTAL_TIMEOUT_SECONDS:g}s refresh window.")
+        task.cancel()
+    executor.shutdown(wait=False, cancel_futures=True)
     return _dedupe_jobs(jobs)
 
 
@@ -660,8 +773,10 @@ def _refresh_job_cache() -> None:
     try:
         result = _fetch_live_job_feed()
         if result:
-            _LIVE_JOB_CACHE.update({"storedAt": _now_utc(), "jobs": result})
-            _store_persisted_jobs(result)
+            previous, _ = _load_persisted_jobs()
+            merged = _dedupe_jobs([*previous, *result])[-200:]
+            _LIVE_JOB_CACHE.update({"storedAt": _now_utc(), "jobs": merged})
+            _store_persisted_jobs(merged)
     finally:
         with _LIVE_JOB_REFRESH_LOCK:
             _LIVE_JOB_REFRESHING = False
@@ -674,6 +789,53 @@ def _start_job_cache_refresh() -> None:
             return
         _LIVE_JOB_REFRESHING = True
     Thread(target=_refresh_job_cache, name="careerai-job-feed-refresh", daemon=True).start()
+
+
+def _job_refresh_scheduler() -> None:
+    while not _JOB_SCHEDULER_STOP.wait(JOB_AUTO_REFRESH_MINUTES * 60):
+        _start_job_cache_refresh()
+
+
+def start_job_refresh_scheduler() -> None:
+    global _JOB_SCHEDULER_THREAD
+    with _JOB_SCHEDULER_LOCK:
+        if _JOB_SCHEDULER_THREAD and _JOB_SCHEDULER_THREAD.is_alive():
+            return
+        _JOB_SCHEDULER_STOP.clear()
+        _JOB_SCHEDULER_THREAD = Thread(
+            target=_job_refresh_scheduler,
+            name="careerai-job-refresh-scheduler",
+            daemon=True,
+        )
+        _JOB_SCHEDULER_THREAD.start()
+
+    _, stored_at = _load_persisted_jobs()
+    if not stored_at or _now_utc() - stored_at >= LIVE_JOB_CACHE_TTL:
+        _start_job_cache_refresh()
+
+
+def stop_job_refresh_scheduler() -> None:
+    global _JOB_SCHEDULER_THREAD
+    with _JOB_SCHEDULER_LOCK:
+        thread = _JOB_SCHEDULER_THREAD
+        _JOB_SCHEDULER_THREAD = None
+        _JOB_SCHEDULER_STOP.set()
+    if thread and thread.is_alive():
+        thread.join(timeout=2)
+
+
+def get_job_refresh_status() -> dict:
+    thread = _JOB_SCHEDULER_THREAD
+    cached_at = _LIVE_JOB_CACHE.get("storedAt")
+    if not isinstance(cached_at, datetime):
+        _, cached_at = _load_persisted_jobs()
+    return {
+        "enabled": True,
+        "running": bool(thread and thread.is_alive()),
+        "refreshing": _LIVE_JOB_REFRESHING,
+        "intervalMinutes": JOB_AUTO_REFRESH_MINUTES,
+        "lastUpdatedAt": cached_at.isoformat() if isinstance(cached_at, datetime) else None,
+    }
 
 
 def _infer_role_from_job(job: dict) -> str:
@@ -695,15 +857,20 @@ def _infer_role_from_job(job: dict) -> str:
     return "Full-Stack Developer"
 
 
-def get_live_jobs(search: str = "", target_role: str | None = None, user_skills: list[str] | None = None) -> list[dict]:
+def get_live_jobs(
+    search: str = "",
+    target_role: str | None = None,
+    user_skills: list[str] | None = None,
+    force_refresh: bool = False,
+) -> list[dict]:
     del search, target_role, user_skills
     cached_jobs = _LIVE_JOB_CACHE.get("jobs")
     cached_at = _LIVE_JOB_CACHE.get("storedAt")
-    if isinstance(cached_jobs, list) and isinstance(cached_at, datetime) and _now_utc() - cached_at < LIVE_JOB_CACHE_TTL:
+    if not force_refresh and isinstance(cached_jobs, list) and isinstance(cached_at, datetime) and _now_utc() - cached_at < LIVE_JOB_CACHE_TTL:
         return cached_jobs
 
     persisted_jobs, persisted_at = _load_persisted_jobs()
-    if persisted_jobs:
+    if persisted_jobs and not force_refresh:
         _LIVE_JOB_CACHE.update({"storedAt": persisted_at or _now_utc(), "jobs": persisted_jobs})
         if not persisted_at or _now_utc() - persisted_at >= LIVE_JOB_CACHE_TTL:
             _start_job_cache_refresh()
@@ -712,14 +879,16 @@ def get_live_jobs(search: str = "", target_role: str | None = None, user_skills:
     with _LIVE_JOB_CACHE_LOCK:
         cached_jobs = _LIVE_JOB_CACHE.get("jobs")
         cached_at = _LIVE_JOB_CACHE.get("storedAt")
-        if isinstance(cached_jobs, list) and isinstance(cached_at, datetime) and _now_utc() - cached_at < LIVE_JOB_CACHE_TTL:
+        if not force_refresh and isinstance(cached_jobs, list) and isinstance(cached_at, datetime) and _now_utc() - cached_at < LIVE_JOB_CACHE_TTL:
             return cached_jobs
 
         result = _fetch_live_job_feed()
         if result:
-            _LIVE_JOB_CACHE.update({"storedAt": _now_utc(), "jobs": result})
-            _store_persisted_jobs(result)
-            return result
+            previous, _ = _load_persisted_jobs()
+            merged = _dedupe_jobs([*previous, *result])[-200:]
+            _LIVE_JOB_CACHE.update({"storedAt": _now_utc(), "jobs": merged})
+            _store_persisted_jobs(merged)
+            return merged
 
         persisted_jobs, _ = _load_persisted_jobs()
         return persisted_jobs if persisted_jobs else []
@@ -763,9 +932,14 @@ def score_job(job: dict, user_skills: list[str], target_role: str | None) -> dic
     }
 
 
-def get_recommended_jobs(user_skills: list[str], target_role: str | None = None, search: str = "") -> list[dict]:
+def get_recommended_jobs(
+    user_skills: list[str],
+    target_role: str | None = None,
+    search: str = "",
+    force_refresh: bool = False,
+) -> list[dict]:
     user_skills = normalize_skills(user_skills)
-    jobs = get_live_jobs(search, target_role, user_skills)
+    jobs = get_live_jobs(search, target_role, user_skills, force_refresh=force_refresh)
     scored = [score_job(job, user_skills, target_role) for job in jobs]
     relevant = [
         job
@@ -789,9 +963,10 @@ def search_jobs(
     sort: str = "relevant",
     page: int = 1,
     page_size: int = 8,
+    force_refresh: bool = False,
 ) -> dict:
     technologies = normalize_skills(technologies or [])
-    scored = get_recommended_jobs(user_skills, target_role, search)
+    scored = get_recommended_jobs(user_skills, target_role, search, force_refresh=force_refresh)
     search_tokens = tokenize(search)
     boosted = []
 
@@ -857,6 +1032,11 @@ def search_jobs(
         "pageSize": page_size,
         "hasMore": start + page_size < len(filtered),
         "searchSuggestions": suggestions,
+        "feedUpdatedAt": (
+            _LIVE_JOB_CACHE.get("storedAt").isoformat()
+            if isinstance(_LIVE_JOB_CACHE.get("storedAt"), datetime)
+            else None
+        ),
         "appliedFilters": {
             "type": type_filter,
             "workMode": work_mode,

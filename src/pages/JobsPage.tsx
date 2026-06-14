@@ -37,6 +37,7 @@ interface JobSearchResponse {
   page: number;
   pageSize: number;
   hasMore: boolean;
+  feedUpdatedAt?: string | null;
   searchSuggestions: string[];
   appliedFilters: {
     type: string;
@@ -82,8 +83,9 @@ export default function JobsPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
+  const [feedUpdatedAt, setFeedUpdatedAt] = useState<string | null>(null);
 
-  const loadJobs = useCallback(async (nextPage = 1, append = false) => {
+  const loadJobs = useCallback(async (nextPage = 1, append = false, forceRefresh = false) => {
     if (append) {
       setLoadingMore(true);
     } else {
@@ -99,6 +101,7 @@ export default function JobsPage() {
       page: String(nextPage),
       pageSize: "8",
     });
+    if (forceRefresh) params.set("refresh", "true");
 
     if (location.trim()) params.set("location", location.trim());
     if (selectedTechnologies.length) params.set("technologies", selectedTechnologies.join(","));
@@ -111,6 +114,7 @@ export default function JobsPage() {
       setTotal(response.total);
       setHasMore(response.hasMore);
       setPage(response.page);
+      setFeedUpdatedAt(response.feedUpdatedAt || null);
     } catch (error) {
       console.error(error);
       toast({
@@ -193,7 +197,8 @@ export default function JobsPage() {
             <p className="mt-2 text-muted-foreground">Live roles ranked for your profile.</p>
           </div>
           <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm text-cyan-800 dark:text-cyan-200">
-            <span className="font-semibold">{total}</span> results found
+            <span className="font-semibold">{total}</span> results
+            {feedUpdatedAt && <span className="ml-2 opacity-75">Updated {new Date(feedUpdatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
           </div>
         </motion.div>
 
@@ -241,7 +246,7 @@ export default function JobsPage() {
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <Filter className="h-4 w-4" />
               <span>{activeFilterCount} active filters</span>
-              <Button size="sm" variant="outline" disabled={loadingJobs} onClick={() => loadJobs(1, false)} className="min-w-36 rounded-full border-border/80 bg-background/70 text-foreground">
+              <Button size="sm" variant="outline" disabled={loadingJobs} onClick={() => loadJobs(1, false, true)} className="min-w-36 rounded-full border-border/80 bg-background/70 text-foreground">
                 <RefreshCcw className={`mr-2 h-4 w-4 ${loadingJobs ? "animate-spin" : ""}`} />
                 {loadingJobs ? "Refreshing..." : "Refresh jobs"}
               </Button>

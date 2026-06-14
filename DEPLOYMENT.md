@@ -63,3 +63,20 @@ VITE_DISABLE_LOCAL_API_FALLBACK=true
 - Refresh the page and sign in again.
 
 Render free services can sleep when idle, so open the API health URL shortly before a live demonstration.
+
+## 5. Automatic job refresh on free hosting
+
+The backend refreshes jobs every 30 minutes while it is running. The repository also includes a GitHub Actions schedule that wakes a sleeping free service.
+
+After the backend is deployed:
+
+1. Open the GitHub repository.
+2. Go to **Settings > Secrets and variables > Actions**.
+3. Add a repository secret:
+
+```text
+Name: CAREERAI_API_URL
+Value: https://YOUR_BACKEND_SERVICE.onrender.com
+```
+
+The workflow runs every 30 minutes. GitHub scheduled workflows can start a few minutes late during busy periods.

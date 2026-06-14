@@ -8,7 +8,7 @@ Full-stack FYP implementation of CareerAI: a context-aware internship and job re
 - Backend: FastAPI
 - Storage: MongoDB via PyMongo
 - Resume parsing: `pypdf` and `python-docx`
-- External integrations: GitHub REST API, Remotive Jobs API, Arbeitnow Job Board API
+- External integrations: GitHub REST API, Jobicy, Arbeitnow, Remote OK, and Jobz.pk Pakistan technology listings
 
 ## Run locally
 

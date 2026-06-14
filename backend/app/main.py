@@ -22,6 +22,7 @@ from .services import (
     generate_next_actions,
     get_dashboard_payload,
     get_match_percent,
+    get_job_refresh_status,
     get_skill_gap,
     get_user_by_token,
     get_user_document_by_token,
@@ -33,6 +34,8 @@ from .services import (
     recommend_career_path,
     remove_bookmark,
     search_jobs,
+    start_job_refresh_scheduler,
+    stop_job_refresh_scheduler,
     toggle_bookmark,
     update_user_profile,
 )
@@ -123,6 +126,12 @@ def get_current_user(token: Annotated[str, Depends(get_bearer_token)]) -> dict:
 @app.on_event("startup")
 def on_startup() -> None:
     init_db()
+    start_job_refresh_scheduler()
+
+
+@app.on_event("shutdown")
+def on_shutdown() -> None:
+    stop_job_refresh_scheduler()
 
 
 @app.get("/api/health")
@@ -132,6 +141,7 @@ def health() -> dict:
         "database": "mongomock" if is_mock_client else "mongodb",
         "llmConfigured": is_llm_configured(),
         "backendBuild": os.getenv("CAREERAI_BACKEND_BUILD", "direct"),
+        "jobs": get_job_refresh_status(),
     }
 
 
@@ -287,6 +297,7 @@ def jobs(
     sort: str = "relevant",
     page: int = 1,
     pageSize: int = 8,
+    refresh: bool = False,
 ) -> dict:
     selected_role = targetRole or user.get("targetRole")
     technology_filters = [item.strip() for item in technologies.split(",") if item.strip()]
@@ -304,6 +315,7 @@ def jobs(
         sort=sort,
         page=page,
         page_size=pageSize,
+        force_refresh=refresh,
     )
 
 
