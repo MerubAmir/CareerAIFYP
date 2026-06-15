@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+from threading import Event, Thread
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
@@ -9,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from .data import CAREER_PATHS, JOB_SKILL_REQUIREMENTS
-from .database import init_db, is_mock_client, utc_now
+from .database import get_database_status, init_db, utc_now
 from .services import (
     create_user,
     derive_skills_from_github,
@@ -41,7 +42,8 @@ from .services import (
 )
 
 app = FastAPI(title="CareerAI API", version="2.0.0")
-init_db()
+_DATABASE_RETRY_STOP = Event()
+_DATABASE_RETRY_THREAD: Thread | None = None
 
 default_cors_origins = [
     "http://localhost:8080",
@@ -125,20 +127,42 @@ def get_current_user(token: Annotated[str, Depends(get_bearer_token)]) -> dict:
 
 @app.on_event("startup")
 def on_startup() -> None:
-    init_db()
-    start_job_refresh_scheduler()
+    global _DATABASE_RETRY_THREAD
+    if init_db():
+        start_job_refresh_scheduler()
+        return
+
+    def retry_database() -> None:
+        while not _DATABASE_RETRY_STOP.wait(10):
+            if init_db():
+                start_job_refresh_scheduler()
+                return
+
+    _DATABASE_RETRY_STOP.clear()
+    _DATABASE_RETRY_THREAD = Thread(
+        target=retry_database,
+        name="careerai-database-retry",
+        daemon=True,
+    )
+    _DATABASE_RETRY_THREAD.start()
 
 
 @app.on_event("shutdown")
 def on_shutdown() -> None:
+    global _DATABASE_RETRY_THREAD
+    _DATABASE_RETRY_STOP.set()
+    if _DATABASE_RETRY_THREAD and _DATABASE_RETRY_THREAD.is_alive():
+        _DATABASE_RETRY_THREAD.join(timeout=2)
+    _DATABASE_RETRY_THREAD = None
     stop_job_refresh_scheduler()
 
 
 @app.get("/api/health")
 def health() -> dict:
+    database_status = get_database_status()
     return {
         "status": "ok",
-        "database": "mongomock" if is_mock_client else "mongodb",
+        **database_status,
         "llmConfigured": is_llm_configured(),
         "backendBuild": os.getenv("CAREERAI_BACKEND_BUILD", "direct"),
         "jobs": get_job_refresh_status(),

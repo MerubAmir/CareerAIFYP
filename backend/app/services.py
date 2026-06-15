@@ -827,7 +827,7 @@ def stop_job_refresh_scheduler() -> None:
 def get_job_refresh_status() -> dict:
     thread = _JOB_SCHEDULER_THREAD
     cached_at = _LIVE_JOB_CACHE.get("storedAt")
-    if not isinstance(cached_at, datetime):
+    if not isinstance(cached_at, datetime) and database_state.get_database_status()["databaseReady"]:
         _, cached_at = _load_persisted_jobs()
     return {
         "enabled": True,
