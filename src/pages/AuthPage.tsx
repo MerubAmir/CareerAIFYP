@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Brain, Lock, Mail, User } from "lucide-react";
+import { ArrowRight, Brain, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { GlassCard } from "@/components/GlassCard";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ export default function AuthPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login, register } = useAuth();
   const { toast } = useToast();
@@ -83,7 +84,23 @@ export default function AuthPage() {
 
             <div className="relative">
               <Lock className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-              <Input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" className="h-12 border-border/80 bg-background/80 pl-10 text-foreground" />
+              <Input
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Password"
+                className="h-12 border-border/80 bg-background/80 pl-10 pr-11 text-foreground"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((current) => !current)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-pressed={showPassword}
+                title={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:bg-cyan-500/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400"
+              >
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
             </div>
 
             <Button type="submit" disabled={loading} className="h-12 w-full rounded-full bg-gradient-to-r from-sky-400 via-cyan-300 to-fuchsia-400 text-slate-950 hover:opacity-90">
