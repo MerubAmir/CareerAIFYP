@@ -93,6 +93,12 @@ _LIVE_JOB_REFRESHING = False
 JOB_FETCH_TIMEOUT_SECONDS = float(os.getenv("JOB_FETCH_TIMEOUT_SECONDS", "18"))
 JOB_FETCH_TOTAL_TIMEOUT_SECONDS = float(os.getenv("JOB_FETCH_TOTAL_TIMEOUT_SECONDS", "22"))
 JOB_AUTO_REFRESH_MINUTES = max(5.0, float(os.getenv("JOB_AUTO_REFRESH_MINUTES", "30")))
+JOBZ_PAKISTAN_URLS = (
+    "https://www.jobz.pk/software-engineer-jobs/",
+    "https://www.jobz.pk/software-engineer-jobs-in-lahore/",
+    "https://www.jobz.pk/software-engineer-jobs-in-islamabad/",
+    "https://www.jobz.pk/software-engineer-jobs-in-karachi/",
+)
 _JOB_SCHEDULER_STOP = Event()
 _JOB_SCHEDULER_LOCK = Lock()
 _JOB_SCHEDULER_THREAD: Thread | None = None
@@ -659,8 +665,7 @@ class _JobzPakistanParser(HTMLParser):
             self._row = None
 
 
-def _fetch_jobz_pakistan_jobs() -> list[dict]:
-    html = _fetch_html("https://www.jobz.pk/software-engineer-jobs/")
+def _parse_jobz_pakistan_jobs(html: str) -> list[dict]:
     parser = _JobzPakistanParser()
     parser.feed(html)
     jobs = []
@@ -696,6 +701,23 @@ def _fetch_jobz_pakistan_jobs() -> list[dict]:
             }
         )
     return jobs
+
+
+def _fetch_jobz_pakistan_jobs() -> list[dict]:
+    jobs: list[dict] = []
+    executor = ThreadPoolExecutor(max_workers=len(JOBZ_PAKISTAN_URLS))
+    tasks = {executor.submit(_fetch_html, url): url for url in JOBZ_PAKISTAN_URLS}
+    completed, pending = wait(tasks, timeout=JOB_FETCH_TIMEOUT_SECONDS)
+    for task in completed:
+        try:
+            jobs.extend(_parse_jobz_pakistan_jobs(task.result()))
+        except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, ValueError, OSError) as exc:
+            print(f"[jobs] Jobz.pk page unavailable ({tasks[task]}): {exc}")
+    for task in pending:
+        print(f"[jobs] Jobz.pk page exceeded the {JOB_FETCH_TIMEOUT_SECONDS:g}s timeout ({tasks[task]}).")
+        task.cancel()
+    executor.shutdown(wait=False, cancel_futures=True)
+    return _dedupe_jobs(jobs)
 
 
 def _parse_cached_datetime(value: object) -> datetime | None:
