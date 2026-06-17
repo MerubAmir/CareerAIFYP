@@ -10,31 +10,43 @@ const FEATURES = [
     icon: Sparkles,
     title: "Resume Intelligence",
     description: "Extract skills and role readiness from your resume.",
+    action: "Analyze resume",
+    to: "/resume",
   },
   {
     icon: Github,
     title: "GitHub Profile Insights",
     description: "Use repositories and languages as verified skill signals.",
+    action: "Connect GitHub",
+    to: "/resume",
   },
   {
     icon: Briefcase,
     title: "Smart Job Matching",
     description: "Rank live roles against your profile and target.",
+    action: "View jobs",
+    to: "/jobs",
   },
   {
     icon: Target,
     title: "Skill Gap Analysis",
     description: "See matched skills and your next priorities.",
+    action: "Compare skills",
+    to: "/skills",
   },
   {
     icon: Map,
     title: "Career Roadmap Planner",
     description: "Follow a practical, role-based learning plan.",
+    action: "Open roadmap",
+    to: "/roadmap",
   },
   {
     icon: BarChart3,
     title: "Decision Dashboard",
     description: "Track readiness, strengths, and saved jobs.",
+    action: "See dashboard",
+    to: "/dashboard",
   },
 ];
 
@@ -111,8 +123,15 @@ export default function LandingPage() {
 
       <section className="px-4 pb-20">
         <div className="mx-auto max-w-7xl">
-          <div className="mb-10 max-w-2xl">
-            <h2 className="font-heading text-3xl font-bold text-foreground sm:text-4xl">Everything you need to move forward</h2>
+          <div className="mb-10 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div className="max-w-2xl">
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-cyan-700 dark:text-cyan-300">Explore CareerAI</p>
+              <h2 className="mt-3 font-heading text-3xl font-bold text-foreground sm:text-4xl">Everything you need to move forward</h2>
+              <p className="mt-3 text-muted-foreground">Click any feature to start that workflow. New users will be guided to create an account first.</p>
+            </div>
+            <Link to="/auth" className="hidden text-sm font-medium text-cyan-700 underline-offset-4 transition hover:text-cyan-900 hover:underline dark:text-cyan-300 dark:hover:text-cyan-100 lg:block">
+              Start with your profile
+            </Link>
           </div>
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {FEATURES.map((feature, index) => (
@@ -123,13 +142,29 @@ export default function LandingPage() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.06 }}
               >
-                <GlassCard hover className="panel-surface h-full">
-                  <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-sky-300/30 to-teal-200/40 text-teal-600">
-                    <feature.icon className="h-6 w-6" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-foreground">{feature.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-muted-foreground">{feature.description}</p>
-                </GlassCard>
+                <Link
+                  to={feature.to}
+                  aria-label={`${feature.action}: ${feature.description}`}
+                  className="group block h-full rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  <GlassCard hover className="panel-surface relative h-full overflow-hidden transition-all duration-300 group-hover:-translate-y-1 group-hover:border-cyan-400/40 group-hover:shadow-2xl group-hover:shadow-cyan-950/10">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-400 via-cyan-300 to-fuchsia-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                    <div className="mb-5 flex items-start justify-between gap-4">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-sky-300/30 via-cyan-200/30 to-fuchsia-300/30 text-teal-600 transition duration-300 group-hover:scale-105 group-hover:text-cyan-700 dark:group-hover:text-cyan-200">
+                        <feature.icon className="h-6 w-6" />
+                      </div>
+                      <span className="rounded-full border border-border/70 bg-background/70 px-3 py-1 text-xs font-medium text-muted-foreground transition group-hover:border-cyan-400/50 group-hover:text-cyan-700 dark:group-hover:text-cyan-200">
+                        Clickable
+                      </span>
+                    </div>
+                    <h3 className="text-xl font-semibold text-foreground transition group-hover:text-cyan-800 dark:group-hover:text-cyan-200">{feature.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{feature.description}</p>
+                    <div className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-cyan-700 transition group-hover:gap-3 dark:text-cyan-300">
+                      {feature.action}
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </GlassCard>
+                </Link>
               </motion.div>
             ))}
           </div>
